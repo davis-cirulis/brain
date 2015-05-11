@@ -1,0 +1,605 @@
+<html>
+<head>
+ <meta charset="UTF-8"> 
+<title>Three.js Viewer</title> 
+<style> 
+	body { margin: 0; } 
+	canvas { width: 80%; height: 100% }
+	#container {width:100%; height:100%;}
+	#menu {float:left; width: 245px; height:100%; background-color:black;}
+	#info {position:absolute; left:325px; height:50px; color:white;}
+</style> 
+</head> 
+<body> 
+<script src="js/three.min.js"></script> 
+<script src="js/LeapTrackballControls.js"></script>
+<script src="js/LeapCameraControls.js"></script>
+<script src="js/leap.min.js"></script>
+<script src="js/OBJLoader.js"></script>
+<script src="js/stats.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/TransformControls.js"></script>
+<script src="js/DAT.GUI.min.js"></script>
+
+<div id="info">
+Q :switch between local/world coordinates, W :move object, E :rotate object, R :scale object, + :increase size, - :decrease size
+</div>
+<div id="menu" style="width:245px;"></div>
+<div id="container"></div>
+<script> // Our Javascript will go here. 
+
+	var renderer, canvasHeight, canvasWidth, camera, leapCamera, scene, stats, container, menu, menuWidth;
+	var orbitControls, transControls, leapController, leapTrackball, guiCtrl, leapObject;
+	var manager, loader;
+	var gui, guiContainer, guiControls;
+	var group;
+	var electrodes = [];
+	var markers = [];
+
+	init();
+	animate();
+	
+	function init() {
+		container = document.getElementById('container');
+		menu = document.getElementById('menu');
+		menuWidth = parseInt(menu.style.width)+20;
+		canvasWidth = window.innerWidth - menuWidth;
+		canvasHeight = window.innerHeight;
+		
+		scene = new THREE.Scene();
+		
+		group = new THREE.Object3D();
+		
+		var ambientLight = new THREE.AmbientLight( 0x111111 );
+		scene.add(ambientLight);
+		
+		var cameraLight = new THREE.PointLight();
+		cameraLight.position.set( 0, 0, -1 );
+		
+		var leapLight = new THREE.PointLight();
+		leapLight.position.set( 0, 0, -1 );
+		
+		camera  = new THREE.PerspectiveCamera(50,canvasWidth/canvasHeight,1,2000);
+		scene.add(camera);
+		camera.add(cameraLight);
+		
+		leapCamera = new THREE.PerspectiveCamera(50,canvasWidth/canvasHeight,1,2000);
+		leapCamera.add(leapLight);
+		
+		loadMenu();
+		
+		manager = new THREE.LoadingManager();
+		loader = new THREE.OBJLoader(manager);
+		
+		renderer = new THREE.WebGLRenderer();
+		renderer.setSize(canvasWidth,canvasHeight);
+		
+		orbitControls = new THREE.OrbitControls(camera,renderer.domElement);
+		orbitControls.addEventListener('change',render);
+		
+		transControls = new THREE.TransformControls(camera,renderer.domElement);
+		transControls.addEventListener('change',render);
+		scene.add(transControls);	
+
+		leapController = new Leap.Controller();
+		
+		leapTrackball = new THREE.LeapTrackballControls(leapCamera,leapController);
+		
+		leapTrackball.rotationSpeed            = 60;
+        leapTrackball.rotationDampening        = 0.8;
+		leapTrackball.rotationLowDampening     = 0.8;
+		leapTrackball.rotationHighDampening    = 0.8;
+		leapTrackball.rotationDampeningCutoff  = 0.8;
+		leapTrackball.zoom 					   = 200;
+        leapTrackball.zoomEnabled              = false;
+		
+		window.addEventListener( 'keydown', function ( event ) {
+				switch ( event.keyCode ) {
+				  case 81: // Q
+					transControls.setSpace( transControls.space == "local" ? "world" : "local" );
+					break;
+				  case 87: // W
+					transControls.setMode( "translate" );
+					break;
+				  case 69: // E
+					transControls.setMode( "rotate" );
+					break;
+				  case 82: // R
+					transControls.setMode( "scale" );
+					break;
+				case 187:
+				case 107: // +,=,num+
+					transControls.setSize( transControls.size + 0.1 );
+					break;
+				case 109:
+				case 173: // -,_,num-
+					transControls.setSize( Math.max(transControls.size - 0.1, 0.1 ) );
+					break;
+				}
+		});
+		
+		container.appendChild(renderer.domElement);
+		
+		stats = new Stats();
+		stats.domElement.style.position = 'absolute';
+		stats.domElement.style.top='0px';
+		stats.domElement.style.left='245px';
+		container.appendChild(stats.domElement);
+		
+		window.addEventListener('resize',onWindowResize,false);
+		
+		//leapController.connect();
+		
+	}
+	
+	function addLeapObjectControll(cam, obj) {
+	
+		leapObjectCtrl = new THREE.LeapObjectControls(cam, obj);
+		
+		leapObjectCtrl.rotateEnabled  = true;
+		leapObjectCtrl.rotateSpeed    = 1;
+		leapObjectCtrl.rotateHands    = 1;
+		leapObjectCtrl.rotateFingers  = 5;
+
+		leapObjectCtrl.scaleEnabled   = true;
+		leapObjectCtrl.scaleSpeed     = 1;
+		leapObjectCtrl.scaleHands     = 1;
+		leapObjectCtrl.scaleFingers   = 4;
+
+		leapObjectCtrl.panEnabled     = true;
+		leapObjectCtrl.panSpeed       = 1;
+		leapObjectCtrl.panHands       = 1;
+		leapObjectCtrl.panFingers     = 3;
+		
+		console.log('Leap Object Controll added');
+		console.log(leapObjectCtrl);
+	}
+	
+	function loadObjModel(modelList) {
+		for(var i=0;i<modelList.length;i++){
+			loader.load(modelList[i],function(object) {
+				object.material = new THREE.MeshLambertMaterial();
+				object.children[0].material.transparent = true;
+				object.children[0].material.side = THREE.DoubleSide;
+				camera.position.y=200;
+				leapCamera.position.y=200;
+		
+				object.rotation.y=Math.PI;
+				group.add(object);
+				draw(modelList.length);
+			});
+		}
+	}
+	
+	function guiCtrl() {
+			var  that = this;
+			
+			this.groupRotate = {
+				x:0,
+				y:0,
+				z:0
+			};
+			this.resetRotate = function() {
+				group.rotation.set(0,0,0);
+				that.groupRotate.x=0;
+				that.groupRotate.y=0;
+				that.groupRotate.z=0;
+			};
+			this.groupScale = {
+				x:1,
+				y:1,
+				z:1
+			};
+			this.resetScale = function() {
+				group.scale.set(1,1,1);
+				that.groupScale.x=1;
+				that.groupScale.y=1;
+				that.groupScale.z=1;
+			};
+			this.groupPosition = {
+				x:0,
+				y:0,
+				z:0
+			};
+			this.resetPosition = function() {
+				group.position.set(0,0,0);
+				that.groupPosition.x=0;
+				that.groupPosition.y=0;
+				that.groupPosition.z=0;
+			};
+			this.groupOpacity = 1;
+			this.placeMarker = function() {
+				var geometry = new THREE.CylinderGeometry(0.8,0.8,33.5,32);
+				var material = new THREE.MeshBasicMaterial({color:0xf1c40f});
+				var cylinder = new THREE.Mesh(geometry,material);
+				markers.push(cylinder);
+				scene.add(cylinder);
+				
+				if(!that.leapObject && !that.leapCamera) {
+					transControls.attach(cylinder);
+				} else {
+					leapTrackball.setRotationObject(cylinder);
+				}
+			};
+			this.removeMarker = function() {
+				if(markers.length>0){
+					var electr = markers.pop();
+					transControls.detach(electr);
+					leapObjectCtrl = null;
+					scene.remove(electr);
+					electr.geometry.dispose();
+					electr.material.dispose();
+					
+					delete electr;
+				}
+				if(markers.length>0){
+					if(!that.leapObject && !that.leapCamera){
+						transControls.attach(markers[markers.length-1]);
+					} else {
+						leapTrackball.setRotationObject(cylinder);
+						
+					}
+				}
+			};
+			
+			this.placeElectrode = function() {
+				var electrodeMat = new THREE.MeshBasicMaterial({color:0xFFFFFF});
+				var electrodeIsolMat = new THREE.MeshBasicMaterial({color:0x00000F});
+				
+				var electrodeGeom = new THREE.CylinderGeometry(0.8,0.8,2,32);
+				var electrodeIsolGeom = new THREE.CylinderGeometry(0.8,0.8,1.5,32);
+				
+				var electrCount = 10;
+				
+				var pointt = new THREE.Vector3( 0, markers[markers.length-1].geometry.parameters.height/2, 0 );
+				var pointb = new THREE.Vector3( 0, -markers[markers.length-1].geometry.parameters.height/2, 0 );
+				
+				pointt.applyEuler( markers[markers.length-1].rotation );
+				pointb.applyEuler( markers[markers.length-1].rotation );
+				
+				var electrodeLength = 33.5;
+				
+				//Vector
+				var pointV = pointb.clone();
+				pointV.sub(pointt);
+				pointV.x/=electrodeLength;
+				pointV.y/=electrodeLength;
+				pointV.z/=electrodeLength;	
+			
+				var startPoint = pointt.clone();
+							
+				var grp = new THREE.Object3D();
+				
+				var vecEl = pointV.clone().multiplyScalar(2);
+				var vecIs = pointV.clone().multiplyScalar(1.5);
+				
+				//First offset
+				startPoint.x+=vecEl.x/2;
+				startPoint.y+=vecEl.y/2;
+				startPoint.z+=vecEl.z/2;
+				
+				for (var i=0;i<(electrCount*2);i+=2){
+					var electr = new THREE.Mesh(electrodeGeom,electrodeMat);
+					var electrIs = new THREE.Mesh(electrodeIsolGeom,electrodeIsolMat);
+					
+					electr.position.x=startPoint.x+markers[markers.length-1].position.x;
+					electr.position.y=startPoint.y+markers[markers.length-1].position.y;
+					electr.position.z=startPoint.z+markers[markers.length-1].position.z;
+
+					electr.rotation.x=markers[markers.length-1].rotation.x;
+					electr.rotation.y=markers[markers.length-1].rotation.y;
+					electr.rotation.z=markers[markers.length-1].rotation.z;
+
+					grp.add(electr);
+					
+					startPoint.x+=((vecEl.x/2)+(vecIs.x/2));
+					startPoint.y+=((vecEl.y/2)+(vecIs.y/2));
+					startPoint.z+=((vecEl.z/2)+(vecIs.z/2));
+					
+					if(i<18){
+						electrIs.position.x=startPoint.x+markers[markers.length-1].position.x;
+						electrIs.position.y=startPoint.y+markers[markers.length-1].position.y;
+						electrIs.position.z=startPoint.z+markers[markers.length-1].position.z;
+						
+						electrIs.rotation.x=markers[markers.length-1].rotation.x;
+						electrIs.rotation.y=markers[markers.length-1].rotation.y;
+						electrIs.rotation.z=markers[markers.length-1].rotation.z;
+					
+						startPoint.x+=((vecEl.x/2)+(vecIs.x/2));
+						startPoint.y+=((vecEl.y/2)+(vecIs.y/2));
+						startPoint.z+=((vecEl.z/2)+(vecIs.z/2));
+						
+						grp.add(electrIs);
+					}
+				
+				}
+				scene.add(grp);
+				
+				electrodes.push(grp);
+			};
+			
+			this.loadWhite = function() {
+				guiControls.resetGroup();
+				console.log('load white');
+				var modelList = [];
+				modelList.push('./models/rh.white.obj');
+				modelList.push('./models/lh.white.obj');
+				loadObjModel(modelList);
+				loadMenu();
+			};
+			
+			this.loadPial = function() {
+				guiControls.resetGroup();
+				console.log('load pial');
+				var modelList = [];
+				modelList.push('./models/rh.pial.obj');
+				modelList.push('./models/lh.pial.obj');
+				loadObjModel(modelList);
+				loadMenu();
+			};
+			
+			this.loadFile = function() {
+				var fileInput = document.getElementById('inputFile');
+				fileInput.click();
+				fileInput.onchange = function(event){
+					var length = event.target.files.length;
+					for(var i=0;i<length;i++){
+						var file = event.target.files[i];
+						var reader = new FileReader();
+						guiControls.resetGroup();
+						reader.onload = function(e) {
+							var object = loader.parse(e.target.result);
+							object.material = new THREE.MeshLambertMaterial();
+							object.children[0].material.transparent = true;
+							object.children[0].material.side = THREE.DoubleSide;
+							camera.position.y=200;
+							leapCamera.position.y=200;
+							group.add(object);
+							
+							draw(length);
+						}
+						reader.readAsText(file);
+					}
+					
+					loadMenu();
+				};
+			};
+			
+			this.resetGroup = function() {
+				scene.remove(group);
+				console.log(renderer);
+				console.log('---------');
+				for(var i=0;i<group.children.length;i++){
+					if(group.children[i].geometry == 'undefined') {
+						for (var j=0;group.children[i].children[j].length;j++){
+							if(group.children[i].children[j].geometry == 'undefined'){
+								console.log("Can't dispose of object");
+							} else {
+								var obj = group.children[i].children[j];
+								try {obj.geometry.dispose();}
+								catch (ex) {}
+								try {obj.material.dispose();}
+								catch (ex) {}
+								delete obj;
+							}
+						}
+					} else {
+						var obj = group.children[i];
+						try {obj.geometry.dispose();}
+						catch (ex) {}
+						try {obj.material.dispose();}
+						catch (ex) {}
+						delete obj;
+					}
+				}
+				delete group;
+				
+				group = new THREE.Object3D();
+			};
+			
+			this.resetElectrodes = function() {
+				var index = markers.length-1;
+				for(var i=index;i>=0;i--){
+					transControls.detach(markers[i]);
+					scene.remove(markers[i]);
+					delete markers[i];
+				}
+				
+				if(that.leapCamera){
+					leapObjectCtrl = null;
+				}
+				
+				markers = new Array();
+				
+				var index = electrodes.length-1;
+				for(var i=index;i>=0;i--){
+					scene.remove(electrodes[i]);
+					delete electrodes[i] ;
+				}
+				
+				electrodes = new Array();
+			};
+			
+			this.resetScene = function() {
+				guiControls.resetGroup();
+				guiControls.resetElectrodes();
+				camera.position.x=0;
+				camera.position.z=0;
+				camera.position.y=200;
+				
+				orbitControls.target.x=0;
+				orbitControls.target.y=0;
+				orbitControls.target.z=0;
+			};
+			
+			this.leapCamera = false;
+			this.leapObject = false;
+			this.print = function() {
+				console.log(markers[markers.length-1]);
+			}
+		}
+	
+	function loadMenu() {
+		try {
+			var length = guiContainer.childNodes.length;
+			for(var i=0;i<length;i++){
+				guiContainer.removeChild(guiContainer.childNodes[0]);
+			}
+		}
+		catch(ex){}
+		
+		guiControls = new guiCtrl();
+		
+		gui = new dat.GUI({autoPlace: false });
+		guiContainer  = document.getElementById('menu');
+		
+		var inputFile = document.createElement("INPUT");
+		inputFile.setAttribute("type","file");
+		inputFile.id="inputFile";
+		inputFile.style.visibility="hidden";
+		inputFile.multiple=true;
+		
+		guiContainer.appendChild(gui.domElement);
+		guiContainer.appendChild(inputFile);
+		
+		var load = gui.addFolder('Load');
+		load.add(guiControls,'loadFile');
+		load.add(guiControls,'loadWhite');
+		load.add(guiControls,'loadPial');
+		
+		var groupFolder = gui.addFolder('Group');
+		
+		var groupRotate = groupFolder.addFolder('Rotation');
+		groupRotate.add(guiControls.groupRotate,'x').min(0).step(0.01).listen().onChange(function(e) {
+			group.rotation.x=e;
+		});
+		groupRotate.add(guiControls.groupRotate,'y').min(0).step(0.01).listen().onChange(function(e) {
+			group.rotation.y=e;
+		});
+		groupRotate.add(guiControls.groupRotate,'z').min(0).step(0.01).listen().onChange(function(e) {
+			group.rotation.z=e;
+		});
+		groupRotate.add(guiControls,'resetRotate');
+		
+		var groupScale = groupFolder.addFolder('Scale');
+		groupScale.add(guiControls.groupScale,'x').min(0).step(0.01).listen().onChange(function(e) {
+			group.scale.x=e;
+		});
+		groupScale.add(guiControls.groupScale,'y').min(0).step(0.01).listen().onChange(function(e) {
+			group.scale.y=e;
+		});
+		groupScale.add(guiControls.groupScale,'z').min(0).step(0.01).listen().onChange(function(e) {
+			group.scale.z=e;
+		});
+		groupScale.add(guiControls,'resetScale');
+		
+		var groupPosition = groupFolder.addFolder('Position');
+		groupPosition.add(guiControls.groupPosition,'x').step(1).listen().onChange(function(e) {
+			group.position.x=e;
+		});
+		groupPosition.add(guiControls.groupPosition,'y').step(1).listen().onChange(function(e) {
+			group.position.y=e;
+		});
+		groupPosition.add(guiControls.groupPosition,'z').step(1).listen().onChange(function(e) {
+			group.position.z=e;
+		});		
+		groupPosition.add(guiControls,'resetPosition');
+		
+		var groupOpacity = groupFolder.addFolder('Opacity');
+		groupOpacity.add(guiControls,'groupOpacity').min(0).step(0.01).max(1).listen().onChange(function(e){
+			for(var i=0;i<group.children.length;i++){
+				group.children[i].children[0].material.opacity = e;
+			}
+		});
+		
+		var electrodeFolder = gui.addFolder('Electrode');
+		electrodeFolder.add(guiControls,'placeMarker');
+		electrodeFolder.add(guiControls,'removeMarker');
+		electrodeFolder.add(guiControls,'placeElectrode');
+	
+		gui.add(guiControls,'resetScene');
+		var leapCam = gui.add(guiControls,'leapCamera').onChange(function(e) {
+			if(e){
+				scene.remove(camera);
+				scene.add(leapCamera);
+				leapController.connect();
+				if(markers.length > 0){
+					transControls.detach(markers[markers.length-1]);
+					leapTrackball.setRotationObject(markers[markers.length-1]);
+				}
+			}else {
+				leapController.disconnect();
+				guiControls.leapObject = false;
+				scene.remove(leapCamera);
+				scene.add(camera);
+				if(markers.length > 0){
+					transControls.attach(markers[markers.length-1]);
+					leapTrackball.setRotationObject(null);
+				}
+			}
+		});
+		leapCam.listen();
+		var leapObj = gui.add(guiControls,'leapObject').onChange(function(e){
+			leapTrackball.setObjectRotation(e);
+			if(e){
+				if(markers.length > 0){
+					leapTrackball.setRotationObject(markers[markers.length-1]);
+				}
+			} else {
+				if(markers.length > 0){
+					leapTrackball.setRotationObject(null);
+				}
+			}
+		});
+		
+		gui.add(guiControls,'print');
+	};
+	
+	function draw(count) {
+		if(group.children.length==count){
+			scene.add(group);
+		}
+	};
+	
+	function onWindowResize() {
+		canvasWidth = window.innerWidth-menuWidth;
+		canvasHeight = window.innerHeight;
+		renderer.setSize(canvasWidth,canvasHeight);
+		
+		if(!guiControls.leapController){
+			camera.aspect = canvasWidth/canvasHeight;
+			camera.updateProjectionMatrix();
+		}else {
+			leapCamera.aspect = canvasWidth/canvasHeight;
+			leapCamera.updateProjectionMatrix();
+		}
+		render();
+	};
+	
+	function render() {
+		if(!guiControls.leapCamera){
+			renderer.render(scene,camera);
+		}else {
+			renderer.render(scene,leapCamera);
+		}
+	};
+	
+	function animate() {
+		requestAnimationFrame(animate,container);
+		if(!guiControls.leapCamera){
+			orbitControls.update();
+			transControls.update();
+		}else {
+			//if(!guiControls.leapObject){
+				leapTrackball.update();
+			//}
+		}
+		
+		stats.update()
+		
+		render();
+	};
+	
+</script>
+</body> 
+</html>
