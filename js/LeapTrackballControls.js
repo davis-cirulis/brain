@@ -23,9 +23,12 @@
 
   THREE.LeapTrackballControls = function ( object , controller , params, domElement ) {
 	var _rotateXLast,_rotateYLast,_rotateZLast;
+	var _panXLast,_panYLast,_panZLast;
     this.object     = object;
+	console.log(this.object);
 	this.rotationObject = null;
 	this.rotateObject = false;
+	this.step         = (object.position.z == 0 ? Math.pow(10, (Math.log(object.near) + Math.log(object.far))/Math.log(10))/10.0 : object.position.z);
     this.controller = controller;
     this.domElement = ( domElement !== undefined ) ? domElement : document;
 
@@ -250,6 +253,10 @@
 
     }
 	
+	this.panTransform = function(delta) {
+		return 4 * THREE.Math.mapLinear(delta, -400, 400, -this.step, this.step);
+	};
+	
 	this.updateObject = function() {
 		var frame = this.controller.frame();
 		var fingers = 0;
@@ -283,6 +290,31 @@
 				_rotateZLast = z;
 			} else if (fingers == 3) {
 				console.log(" PAN OBJECT" );
+				var pos = frame.pointables[1].tipPosition;
+				var x = pos[0];
+				var y = pos[1];
+				var z = pos[2];
+				if (!_panXLast) _panXLast = x;
+				if (!_panYLast) _panYLast = y;
+				if (!_panZLast) _panZLast = z;
+				var xDelta = x - _panXLast;
+				var yDelta = y - _panYLast;
+				var zDelta = z - _panZLast;
+				
+				console.log(xDelta,yDelta,zDelta);
+				console.log(_panXLast,_panYLast,_panZLast);
+				
+				this.rotationObject.position.x += xDelta;
+				this.rotationObject.position.y += yDelta;
+				this.rotationObject.position.z += zDelta;
+
+				//var v = this.object.localToWorld(new THREE.Vector3(this.panTransform(xDelta), this.panTransform(yDelta), this.panTransform(zDelta)));
+				//v.sub(this.object.position);
+				//this.rotationObject.position.add(v);
+
+				_panXLast    = x;
+				_panYLast    = y;
+				_panZLast    = z;
 			}
 		}
 	}
