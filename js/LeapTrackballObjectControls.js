@@ -21,11 +21,11 @@
    *    
    */    
 
-  THREE.LeapTrackballControls = function ( object , controller , params, domElement ) {
+  THREE.LeapTrackballObjectControls = function ( object , controller , params, domElement ) {
+
     this.object     = object;
 	this.enabled = true;
-	this.step         = (object.position.z == 0 ? Math.pow(10, (Math.log(object.near) + Math.log(object.far))/Math.log(10))/10.0 : object.position.z);
-    this.controller = controller;
+	this.controller = controller;
     this.domElement = ( domElement !== undefined ) ? domElement : document;
 
     this.clock      = new THREE.Clock(); // for smoother transitions
@@ -38,8 +38,6 @@
     this.rotatingCamera.position = this.object.position.clone();
 
     this.rotatingObject.add( this.rotatingCamera );
-
-    this.zoomSpeed                = 0;
     
     
     //API
@@ -48,15 +46,6 @@
     this.rotationLowDampening     = .98;
     this.rotationHighDampening    = .7;
     this.rotationDampeningCutoff  = .9;
-    
-    this.zoomEnabled              = true;
-    this.zoom                     = 40;
-    this.zoomDampening            = .6;
-    this.zoomCutoff               = .9;
-    this.zoomSpeedRatio           = 10;
-
-    this.minZoom                  = 20;
-    this.maxZoom                  = 80;
 
     this.rotation = new THREE.Quaternion();
     this.angularVelocity = new THREE.Vector3();
@@ -132,89 +121,18 @@
 
     }
 
-    this.getZoomForce = function( frame ){
-
-      var zoomForce = 0;
-
-      if( frame.hands[0] ){
-
-        var hand = frame.hands[0];
-        var handNormal = new THREE.Vector3().fromArray( hand.palmNormal );
-
-        if( Math.abs( handNormal.z ) > this.zoomCutoff ){
-
-          var palmVelocity = new THREE.Vector3().fromArray( hand.palmVelocity );
-
-          for( var i = 0; i < hand.fingers.length; i++ ){
-
-            var finger = hand.fingers[i];
-
-            if( finger.extended ){
-
-              var fD = finger.direction;
-              var fV = finger.tipVelocity;
-              
-              // First off see if the fingers pointed
-              // the same direction as the hand
-              var fDirection = new THREE.Vector3().fromArray( fD );
-              
-              var match = fDirection.dot( handNormal );
-
-              // because fingers should be perp to handNormal, make the answer 1 - match
-              var force = 1 - match;
-
-              var fVelocity = new THREE.Vector3().fromArray( fV );
-          
-              var dir = fVelocity.dot( new THREE.Vector3( 0 , 0 , 1 ) );
-
-              var zoomSpeedRatio = this.zoomSpeedRatio / 1000;
-              zoomForce -= dir* zoomSpeedRatio;
-           
-            }
-
-          }
-        }
-      } 
-      return zoomForce;
-
-    }
-
     this.update = function(){
-		var frame     = this.controller.frame();
-		
-		if(this.enabled){
+		if(this.enabled = true) {
       // making sure our matrix transforms don't get overwritten
       this.object.matrixAutoUpdate = false; 
 
-      
+      var frame     = this.controller.frame();
 
       var torque    = this.getTorque( frame );
       var dTime     = this.clock.getDelta();
 
       var rotationDampening   = this.getRotationDampening( frame );
-      
-      if( this.zoomEnabled ){
 
-        var zoomForce = this.getZoomForce(  frame );
-        
-        this.zoomSpeed  += zoomForce * dTime;
-        this.zoom       += this.zoomSpeed;
-        this.zoomSpeed  *= this.zoomDampening;
-
-        // Maxes sure that we done go below or above the max zoom!
-        if( this.zoom > this.maxZoom ){
-
-          this.zoom       = this.maxZoom;
-          this.zoomSpeed  = 0;
-
-        }else if( this.zoom < this.minZoom ){
-
-          this.zoom       = this.minZoom;
-          this.zoomSpeed  = 0;
-
-        }
-
-      }
       this.angularVelocity.add( torque );
       this.angularVelocity.multiplyScalar( rotationDampening );
            
@@ -234,24 +152,27 @@
       this.rotatingObject.rotation.setFromQuaternion( rotation );
 
       this.rotatingObject.updateMatrix();
-      
-	  this.updateCameraPosition();
-	}
+	  
+	  this.object.matrix.copy(this.rotatingObject.matrix);
+       this.object.matrixWorldNeedsUpdate = true;
+	   
+	 // this.updateCameraPosition();
+		}
     }
 
     this.updateCameraPosition = function(){
 
       var matrix = this.rotatingObject.matrix;
 
-      var inverse = new THREE.Matrix4().getInverse( matrix );
+      //var inverse = new THREE.Matrix4().getInverse( matrix );
 
       var translationMatrix = new THREE.Matrix4();
 
-      var pos = new THREE.Vector3( 0 , 0 , this.zoom );
+      var pos = new THREE.Vector3( 0 , 0 , 0 );
       translationMatrix.setPosition( pos );
 
       var rotatedMatrix = new THREE.Matrix4();
-      rotatedMatrix.multiplyMatrices( inverse , translationMatrix );
+      rotatedMatrix.multiplyMatrices( matrix , translationMatrix );
 
       this.object.matrix.copy( rotatedMatrix );
       this.object.matrixWorldNeedsUpdate = true;
@@ -268,7 +189,7 @@
 
       // The camera is always looking at the center of the object
       // it is rotating around.
-      this.object.lookAt( this.rotatingObject.position );
+      //this.object.lookAt( this.rotatingObject.position );
 
     }
 

@@ -13,6 +13,7 @@
 <body> 
 <script src="js/three.min.js"></script> 
 <script src="js/LeapTrackballControls.js"></script>
+<script src="js/LeapTrackballObjectControls.js"></script>
 <script src="js/LeapCameraControls.js"></script>
 <script src="js/leap.min.js"></script>
 <script src="js/OBJLoader.js"></script>
@@ -29,7 +30,8 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 <script> // Our Javascript will go here. 
 
 	var renderer, canvasHeight, canvasWidth, camera, leapCamera, scene, stats, container, menu, menuWidth;
-	var orbitControls, transControls, leapController, leapTrackball, guiCtrl, leapObject;
+	var orbitControls, transControls, leapTrackball, leapTrackballObject, guiCtrl, leapObject;
+	var leapControllerCam, leapControllerObj;
 	var manager, loader;
 	var gui, guiContainer, guiControls;
 	var group;
@@ -81,10 +83,11 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		transControls.addEventListener('change',render);
 		scene.add(transControls);	
 
-		leapController = new Leap.Controller();
+		leapControllerCam = new Leap.Controller();
+		leapControllerObj = new Leap.Controller();
 		
-		leapTrackball = new THREE.LeapTrackballControls(leapCamera,leapController);
-		
+		leapTrackball = new THREE.LeapTrackballControls(leapCamera,leapControllerCam);
+		leapTrackball.enabled = false;
 		leapTrackball.rotationSpeed            = 60;
         leapTrackball.rotationDampening        = 0.8;
 		leapTrackball.rotationLowDampening     = 0.8;
@@ -132,27 +135,15 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		
 	}
 	
-	function addLeapObjectControll(cam, obj) {
-	
-		leapObjectCtrl = new THREE.LeapObjectControls(cam, obj);
+	function addLeapObjectControll(obj) {
 		
-		leapObjectCtrl.rotateEnabled  = true;
-		leapObjectCtrl.rotateSpeed    = 1;
-		leapObjectCtrl.rotateHands    = 1;
-		leapObjectCtrl.rotateFingers  = 5;
-
-		leapObjectCtrl.scaleEnabled   = true;
-		leapObjectCtrl.scaleSpeed     = 1;
-		leapObjectCtrl.scaleHands     = 1;
-		leapObjectCtrl.scaleFingers   = 4;
-
-		leapObjectCtrl.panEnabled     = true;
-		leapObjectCtrl.panSpeed       = 1;
-		leapObjectCtrl.panHands       = 1;
-		leapObjectCtrl.panFingers     = 3;
-		
-		console.log('Leap Object Controll added');
-		console.log(leapObjectCtrl);
+		leapTrackballObject = new THREE.LeapTrackballObjectControls(obj,leapControllerObj);
+		leapTrackballObject.rotationSpeed            = 60;
+        leapTrackballObject.rotationDampening        = 0.8;
+		leapTrackballObject.rotationLowDampening     = 0.8;
+		leapTrackballObject.rotationHighDampening    = 0.8;
+		leapTrackballObject.rotationDampeningCutoff  = 0.8;
+		leapTrackballObject.enabled = false;
 	}
 	
 	function loadObjModel(modelList) {
@@ -218,7 +209,10 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 				if(!that.leapObject && !that.leapCamera) {
 					transControls.attach(cylinder);
 				} else {
-					leapTrackball.setRotationObject(cylinder);
+					if(that.leapCamera){
+						addLeapObjectControll(cylinder);
+						leapTrackballObject.enabled = true;
+					}
 				}
 			};
 			this.removeMarker = function() {
@@ -236,8 +230,10 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 					if(!that.leapObject && !that.leapCamera){
 						transControls.attach(markers[markers.length-1]);
 					} else {
-						leapTrackball.setRotationObject(cylinder);
-						
+						if(that.leapCamera){
+							addLeapObjectControll(markers[markers.length-1]);
+							leapTrackballObject.enabled = true;
+						}
 					}
 				}
 			};
@@ -427,6 +423,8 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 				camera.position.z=0;
 				camera.position.y=200;
 				
+				//LEAP CAMERA RESET
+				
 				orbitControls.target.x=0;
 				orbitControls.target.y=0;
 				orbitControls.target.z=0;
@@ -436,6 +434,7 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 			this.leapObject = false;
 			this.print = function() {
 				console.log(markers[markers.length-1]);
+				console.log(leapTrackballObject);
 			}
 		}
 	
@@ -521,33 +520,54 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		var leapCam = gui.add(guiControls,'leapCamera').onChange(function(e) {
 			if(e){
 				scene.remove(camera);
+				leapControllerCam.connect();
+				leapControllerObj.disconnect();
+				
 				scene.add(leapCamera);
-				leapController.connect();
+				leapTrackball.enabled = true;
+				if(leapTrackballObject != undefined ){
+					leapTrackballObject.enabled = false;
+				}
 				if(markers.length > 0){
 					transControls.detach(markers[markers.length-1]);
-					leapTrackball.setRotationObject(markers[markers.length-1]);
+					//addLeapObjectControll(markers[markers.length-1]);
 				}
 			}else {
-				leapController.disconnect();
+				leapControllerCam.disconnect();
+				leapControllerObj.disconnect();
 				guiControls.leapObject = false;
+				leapTrackball.enabled = false;
+				if(leapTrackballObject != undefined) {
+					leapTrackballObject.enabled = false;
+				}
 				scene.remove(leapCamera);
 				scene.add(camera);
 				if(markers.length > 0){
 					transControls.attach(markers[markers.length-1]);
-					leapTrackball.setRotationObject(null);
 				}
 			}
 		});
 		leapCam.listen();
 		var leapObj = gui.add(guiControls,'leapObject').onChange(function(e){
-			leapTrackball.setObjectRotation(e);
 			if(e){
+				if(!leapCamera){leapObject=false;return;}
+				leapControllerCam.disconnect();
+				leapControllerObj.connect();
+				leapTrackball.enabled = false;
 				if(markers.length > 0){
-					leapTrackball.setRotationObject(markers[markers.length-1]);
+					if(leapTrackballObject != undefined) {
+						leapTrackballObject.enabled = true;
+						
+					} else {
+						addLeapObjectControll(markers[markers.length-1]);
+					}
 				}
 			} else {
+				leapControllerCam.connect();
+				leapControllerObj.disconnect();
+				leapTrackball.enabled = true;
 				if(markers.length > 0){
-					leapTrackball.setRotationObject(null);
+					leapTrackballObject.enabled = false;
 				}
 			}
 		});
@@ -566,13 +586,12 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		canvasHeight = window.innerHeight;
 		renderer.setSize(canvasWidth,canvasHeight);
 		
-		if(!guiControls.leapController){
-			camera.aspect = canvasWidth/canvasHeight;
-			camera.updateProjectionMatrix();
-		}else {
-			leapCamera.aspect = canvasWidth/canvasHeight;
-			leapCamera.updateProjectionMatrix();
-		}
+		camera.aspect = canvasWidth/canvasHeight;
+		camera.updateProjectionMatrix();
+		
+		leapCamera.aspect = canvasWidth/canvasHeight;
+		leapCamera.updateProjectionMatrix();
+		
 		render();
 	};
 	
@@ -590,9 +609,13 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 			orbitControls.update();
 			transControls.update();
 		}else {
-			//if(!guiControls.leapObject){
+			if(leapTrackball.enabled){
 				leapTrackball.update();
-			//}
+			}
+			if(leapTrackballObject != undefined && leapTrackballObject.enabled){
+				leapTrackballObject.update();
+			}
+
 		}
 		
 		stats.update()

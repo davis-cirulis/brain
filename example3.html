@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Three.js ・ Leap Controls</title>
+    <meta charset="utf-8">
+    <meta name="author" content="Torsten Sprenger">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link href='http://fonts.googleapis.com/css?family=Fauna+One' rel='stylesheet' type='text/css'>
+    <link href='css/style.css' rel='stylesheet' type='text/css'>
+    <script type="text/javascript" src="js/Detector.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/three.min.js"></script>
+    <script type="text/javascript" src="js/leap.min.js"></script>
+    <script type="text/javascript" src="js/LeapTrackballControls.js"></script>
+    <script type="text/javascript" src="js/LeapTrackballObjectControls.js"></script>
+    <script type="text/javascript">
+      var camera, scene, renderer, projector, light;
+      var objects = [], objectControls;
+      var coords1, coords2, coords3;
+      var lastControlsIndex = -1, controlsIndex = -1, index = -1;
+	  var leapControllerCam, leapControllerObj;
+	  var leapTrackballObject, leapTrackball;
+	  var container;
+	  var object;
+	  var obj;
+	  
+      function init() {
+        // is webgl supported?
+        if (!Detector.webgl) {
+          Detector.addGetWebGLMessage();
+          return false;
+        };
+
+        // renderer
+        renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setSize($(window).width(), $(window).height());
+        renderer.setClearColor(0xffffff, 1);
+		container = $("#container");
+        $("#container").append(renderer.domElement);
+
+        // camera
+        camera = new THREE.PerspectiveCamera(25, $(window).width()/$(window).height(), 0.1, 10000);
+		camera.position.set(200,200,0);
+        var origin = new THREE.Vector3(0, 0, 0);
+        camera.lookAt(origin);
+
+		leapControllerCam = new Leap.Controller();
+		leapControllerObj = new Leap.Controller();
+
+		
+		leapTrackball = new THREE.LeapTrackballControls(camera,leapControllerCam);
+		leapTrackball.enabled = true;
+		leapTrackball.rotationSpeed            = 60;
+        leapTrackball.rotationDampening        = 0.8;
+		leapTrackball.rotationLowDampening     = 0.8;
+		leapTrackball.rotationHighDampening    = 0.8;
+		leapTrackball.rotationDampeningCutoff  = 0.8;
+		leapTrackball.zoom 					   = 200;
+        leapTrackball.zoomEnabled              = false;
+		
+        // world
+        scene = new THREE.Scene(); 
+
+        // world coordinate system (thin dashed helping lines)
+
+        // cubes
+		var geom = new THREE.BoxGeometry(20,20,20);
+		var material = new THREE.MeshBasicMaterial({color:0xf1c40f});
+		obj = new THREE.Mesh(geom,material);
+		obj.position.set(0,0,50);
+		scene.add(obj);
+		
+			var geometry = new THREE.BoxGeometry(20,20,20);
+				var material = new THREE.MeshBasicMaterial({color:0xf1c40f});
+				//var cylinder = new THREE.Mesh(geometry,material);
+          //var geometry = new THREE.BoxGeometry(60,60,60);
+          object = new THREE.Mesh(geometry, material);
+          object.position.x = 0;
+          object.position.y = 0;
+          object.position.z = 0;
+
+          object.receiveShadow = true;
+			
+		//leapTrackballObject = new THREE.LeapTrackballObjectControls(object,leapControllerObj);
+		//leapTrackballObject.rotationSpeed            = 60;
+        //leapTrackballObject.rotationDampening        = 0.8;
+		//leapTrackballObject.rotationLowDampening     = 0.8;
+		////leapTrackballObject.rotationHighDampening    = 0.8;
+		//leapTrackballObject.rotationDampeningCutoff  = 0.8;
+		//leapTrackballObject.enabled = true;
+          // leap object controls
+          scene.add(object);
+		//leapControllerCam.connect();
+		//leapControllerObj.connect();
+         
+		 window.addEventListener( 'keydown', function ( event ) {
+				switch ( event.keyCode ) {
+				  case 81: // Q
+					leapControllerCam.connect();
+					leapControllerObj.disconnect();
+					break;
+				  case 87: // W
+					leapControllerCam.disconnect();
+					leapControllerObj.connect();
+					break;
+				}
+		});
+		 
+
+        // light
+        light = new THREE.PointLight(0xdedede);
+        light.position = camera.position;
+		
+		var amb = new THREE.AmbientLight(0xdfdfdf);
+		scene.add(amb);
+		
+        camera.add(light);
+
+        // listen to resize event
+        window.addEventListener('resize', onWindowResize, false);
+
+        // render (if no leap motion controller is detected, then this call is needed in order to see the plot)
+        render();
+      };
+
+      function render() {
+        renderer.render(scene, camera);
+      };
+
+      function onWindowResize() {
+        camera.aspect = $(window).width()/$(window).height();
+        camera.updateProjectionMatrix();
+        renderer.setSize($(window).width(), $(window).height());
+        render();
+      };
+	  
+	  function animate() {
+		requestAnimationFrame(animate,container);
+		//leapTrackball.update();\
+		var rot = [];
+		if(leapControllerObj.lastFrame._rotation!=undefined) {
+			rot = leapControllerObj.lastFrame._rotation }
+		
+		var matrix3 = new THREE.Matrix3();
+		matrix3.elements = rot;
+		//console.log(matrix3.elements);
+		//rot = object.rotation.toArray();
+		var unitVec = new THREE.Vector3(0,0,-1);
+		//console.log(unitVec);
+		unitVec.applyQuaternion(camera.quaternion);
+		//console.log(unitVec);
+		rot = unitVec.toArray();
+		//var order = rot.pop();
+		//console.log(rot);
+		//console.log(order);
+		var arr = new THREE.Vector3(matrix3.elements[0]*rot[0]+matrix3.elements[1]*rot[1]+matrix3.elements[2]*rot[2],
+		matrix3.elements[3]*rot[0]+matrix3.elements[4]*rot[1]+matrix3.elements[5]*rot[2],
+		matrix3.elements[6]*rot[0]+matrix3.elements[7]*rot[1]+matrix3.elements[8]*rot[2]);
+		//console.log(arr);
+		obj.rotation.setFromVector3(arr,camera.order);
+		
+		//console.log(matrix3);
+		
+		//object.rotation.setFromRotationMatrix(matrix3,"XYZ");
+		//console.log(object.rotation);
+		
+		leapTrackball.update();
+		
+		render();
+	};
+
+      $(function(){
+        init();
+		animate();
+      });
+    </script>   
+  </head>
+
+  <body>
+    <div id="container"></div>
+  </body>
+</html>
