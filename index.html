@@ -27,16 +27,15 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 <script> // Our Javascript will go here. 
 
 	var renderer, canvasHeight, canvasWidth, camera, scene, stats, container, menu, menuWidth;
-	var orbitControls, transControls, guiCtrl;
+	var orbitControls, transControls, controller;
 	var manager, loader;
-	var gui, guiContainer, guiControls;
+	var gui, guiContainer, guiCtrl, guiControls;
 	var group;
 	var electrodes = [];
 	var markers = [];
 	var lastRotationX,lastRotationY;
 	var lastPanX, lastPanY, lastPanZ;
 	var dRX=0,dRY=0,dPX=0,dPY=0,dPZ=0;
-	var controller;
 	
 	init();
 	animate();
@@ -113,9 +112,7 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		container.appendChild(stats.domElement);
 		
 		window.addEventListener('resize',onWindowResize,false);
-		
-		//leapController.connect();
-		
+
 	}
 	
 	function loadObjModel(modelList) {
@@ -322,8 +319,6 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 			
 			this.resetGroup = function() {
 				scene.remove(group);
-				console.log(renderer);
-				console.log('---------');
 				for(var i=0;i<group.children.length;i++){
 					if(group.children[i].geometry == 'undefined') {
 						for (var j=0;group.children[i].children[j].length;j++){
@@ -384,9 +379,6 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 			};
 			
 			this.leapController = false;
-			this.print = function() {
-				console.log(markers[markers.length-1]);
-			}
 		}
 	
 	function loadMenu() {
@@ -472,32 +464,30 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 			if(e){
 				if(markers.length > 0){
 					transControls.detach(markers[markers.length-1]);
-					controller.connect();
 				}
+				controller.connect();
 			} else {
+				if(markers.length > 0){
 					transControls.attach(markers[markers.length-1]);
-					controller.disconnect();
+				}
+				controller.disconnect();
 			}
 		});
-		
-		gui.add(guiControls,'print');
 	};
-	
-		// Rotate an object around an arbitrary axis in world space       
+	    
 	function rotateAroundWorldAxis(object, axis, radians) {
 		var rotWorldMatrix = new THREE.Matrix4();
 		rotWorldMatrix.makeRotationAxis(axis.normalize(), radians);
 
-		rotWorldMatrix.multiply(object.matrix);                // pre-multiply
+		rotWorldMatrix.multiply(object.matrix);
 
 		object.matrix = rotWorldMatrix;
 
 		object.rotation.setFromRotationMatrix(object.matrix);
 	}
 	
-	function leapRotateObject(object) {
+	function leapObjectControl(object) {
 		var frame = controller.frame();
-		//console.log(frame);
 		var fingers = 0;
 		for(var i=0;i<frame.pointables.length;i++){
 			if(frame.pointables[i].extended){
@@ -531,42 +521,41 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 				rotateUp.applyQuaternion(camera.quaternion);
 				rotateAroundWorldAxis(object,rotateUp,dRY/100); //rotate on x axis
 				dRY=0;
-				} else if( fingers == 3 ){
+			} else if( fingers == 3 ){
 
-					
-					if(lastPanX == undefined) lastPanX = x;
-					if(lastPanY == undefined) lastPanY = y;
-					if(lastPanZ == undefined) lastPanZ = z;
-					
-					dPX = x-lastPanX;
-					dPY = y-lastPanY;
-					dPZ = z-lastPanZ;
-					
-					var translateUp = new THREE.Vector3(0,1,0);
-					translateUp.applyQuaternion(camera.quaternion);
-					object.translateOnAxis(translateUp,dPY);
-					
-					var translateRight = new THREE.Vector3(1,0,0);
-					translateRight.applyQuaternion(camera.quaternion);
-					object.translateOnAxis(translateRight,dPX);
-					
-					var translateFront = new THREE.Vector3(0,0,1);
-					translateFront.applyQuaternion(camera.quaternion);
-					object.translateOnAxis(translateFront,dPZ);
-					
-					lastPanX=x;
-					lastPanY=y;
-					lastPanZ=z;
-				}
-				else {
-					lastRotationX=undefined;
-					lastRotationY=undefined;
-					lastPanX=undefined;
-					lastPanY=undefined;
-					lastPanZ=undefined;
-				}
-			
+				if(lastPanX == undefined) lastPanX = x;
+				if(lastPanY == undefined) lastPanY = y;
+				if(lastPanZ == undefined) lastPanZ = z;
+				
+				dPX = x-lastPanX;
+				dPY = y-lastPanY;
+				dPZ = z-lastPanZ;
+				
+				var translateUp = new THREE.Vector3(0,1,0);
+				translateUp.applyQuaternion(camera.quaternion);
+				object.translateOnAxis(translateUp,dPY);
+				
+				var translateRight = new THREE.Vector3(1,0,0);
+				translateRight.applyQuaternion(camera.quaternion);
+				object.translateOnAxis(translateRight,dPX);
+				
+				var translateFront = new THREE.Vector3(0,0,1);
+				translateFront.applyQuaternion(camera.quaternion);
+				object.translateOnAxis(translateFront,dPZ);
+				
+				lastPanX=x;
+				lastPanY=y;
+				lastPanZ=z;
 			}
+			else {
+				lastRotationX=undefined;
+				lastRotationY=undefined;
+				lastPanX=undefined;
+				lastPanY=undefined;
+				lastPanZ=undefined;
+			}
+			
+		}
 	}
 	
 	function draw(count) {
@@ -596,7 +585,7 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 		transControls.update();
 		stats.update();
 		if(guiControls.leapController) {
-			leapRotateObject(markers[markers.length-1]);
+			leapObjectControl(markers[markers.length-1]);
 		}
 		render();
 	};
