@@ -26,569 +26,569 @@ Q :switch between local/world coordinates, W :move object, E :rotate object, R :
 <div id="container"></div>
 <script> // Our Javascript will go here. 
 
-	var renderer, canvasHeight, canvasWidth, camera, scene, stats, container, menu, menuWidth;
-	var orbitControls, transControls, controller;
-	var manager, loader;
-	var gui, guiContainer, guiCtrl, guiControls;
-	var group;
-	var electrodes = [];
-	var markers = [];
-	var lastRotationX,lastRotationY;
-	var lastPanX, lastPanY, lastPanZ;
-	var dRX=0,dRY=0,dPX=0,dPY=0,dPZ=0;
+var renderer, canvasHeight, canvasWidth, camera, scene, stats, container, menu, menuWidth;
+var orbitControls, transControls, controller;
+var manager, loader;
+var gui, guiContainer, guiCtrl, guiControls;
+var group;
+var electrodes = [];
+var markers = [];
+var lastRotationX,lastRotationY;
+var lastPanX, lastPanY, lastPanZ;
+var dRX=0,dRY=0,dPX=0,dPY=0,dPZ=0;
+
+init();
+animate();
+
+function init() {
+	container = document.getElementById('container');
+	menu = document.getElementById('menu');
+	menuWidth = parseInt(menu.style.width)+20;
+	canvasWidth = window.innerWidth - menuWidth;
+	canvasHeight = window.innerHeight;
 	
-	init();
-	animate();
+	scene = new THREE.Scene();
 	
-	function init() {
-		container = document.getElementById('container');
-		menu = document.getElementById('menu');
-		menuWidth = parseInt(menu.style.width)+20;
-		canvasWidth = window.innerWidth - menuWidth;
-		canvasHeight = window.innerHeight;
-		
-		scene = new THREE.Scene();
-		
-		group = new THREE.Object3D();
-		
-		var ambientLight = new THREE.AmbientLight( 0x111111 );
-		scene.add(ambientLight);
-		
-		var cameraLight = new THREE.PointLight();
-		cameraLight.position.set( 0, 0, -1 );
-		
-		camera  = new THREE.PerspectiveCamera(50,canvasWidth/canvasHeight,1,2000);
-		scene.add(camera);
-		camera.add(cameraLight);
-		
-		loadMenu();
-		
-		manager = new THREE.LoadingManager();
-		loader = new THREE.OBJLoader(manager);
-		
-		renderer = new THREE.WebGLRenderer();
-		renderer.setSize(canvasWidth,canvasHeight);
-		
-		orbitControls = new THREE.OrbitControls(camera,renderer.domElement);
-		orbitControls.addEventListener('change',render);
-		
-		transControls = new THREE.TransformControls(camera,renderer.domElement);
-		transControls.addEventListener('change',render);
-		scene.add(transControls);	
-		
-		controller = new Leap.Controller();
-		
-		window.addEventListener( 'keydown', function ( event ) {
-				switch ( event.keyCode ) {
-				  case 81: // Q
-					transControls.setSpace( transControls.space == "local" ? "world" : "local" );
-					break;
-				  case 87: // W
-					transControls.setMode( "translate" );
-					break;
-				  case 69: // E
-					transControls.setMode( "rotate" );
-					break;
-				  case 82: // R
-					transControls.setMode( "scale" );
-					break;
-				case 187:
-				case 107: // +,=,num+
-					transControls.setSize( transControls.size + 0.1 );
-					break;
-				case 109:
-				case 173: // -,_,num-
-					transControls.setSize( Math.max(transControls.size - 0.1, 0.1 ) );
-					break;
-				}
+	group = new THREE.Object3D();
+	
+	var ambientLight = new THREE.AmbientLight( 0x111111 );
+	scene.add(ambientLight);
+	
+	var cameraLight = new THREE.PointLight();
+	cameraLight.position.set( 0, 0, -1 );
+	
+	camera  = new THREE.PerspectiveCamera(50,canvasWidth/canvasHeight,1,2000);
+	scene.add(camera);
+	camera.add(cameraLight);
+	
+	loadMenu();
+	
+	manager = new THREE.LoadingManager();
+	loader = new THREE.OBJLoader(manager);
+	
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize(canvasWidth,canvasHeight);
+	
+	orbitControls = new THREE.OrbitControls(camera,renderer.domElement);
+	orbitControls.addEventListener('change',render);
+	
+	transControls = new THREE.TransformControls(camera,renderer.domElement);
+	transControls.addEventListener('change',render);
+	scene.add(transControls);	
+	
+	controller = new Leap.Controller();
+	
+	window.addEventListener( 'keydown', function ( event ) {
+			switch ( event.keyCode ) {
+			  case 81: // Q
+				transControls.setSpace( transControls.space == "local" ? "world" : "local" );
+				break;
+			  case 87: // W
+				transControls.setMode( "translate" );
+				break;
+			  case 69: // E
+				transControls.setMode( "rotate" );
+				break;
+			  case 82: // R
+				transControls.setMode( "scale" );
+				break;
+			case 187:
+			case 107: // +,=,num+
+				transControls.setSize( transControls.size + 0.1 );
+				break;
+			case 109:
+			case 173: // -,_,num-
+				transControls.setSize( Math.max(transControls.size - 0.1, 0.1 ) );
+				break;
+			}
+	});
+	
+	container.appendChild(renderer.domElement);
+	
+	stats = new Stats();
+	stats.domElement.style.position = 'absolute';
+	stats.domElement.style.top='0px';
+	stats.domElement.style.left='245px';
+	container.appendChild(stats.domElement);
+	
+	window.addEventListener('resize',onWindowResize,false);
+
+}
+
+function loadObjModel(modelList) {
+	for(var i=0;i<modelList.length;i++){
+		loader.load(modelList[i],function(object) {
+			object.material = new THREE.MeshLambertMaterial();
+			object.children[0].material.transparent = true;
+			object.children[0].material.side = THREE.DoubleSide;
+			camera.position.y=200;
+	
+			object.rotation.y=Math.PI;
+			group.add(object);
+			draw(modelList.length);
 		});
-		
-		container.appendChild(renderer.domElement);
-		
-		stats = new Stats();
-		stats.domElement.style.position = 'absolute';
-		stats.domElement.style.top='0px';
-		stats.domElement.style.left='245px';
-		container.appendChild(stats.domElement);
-		
-		window.addEventListener('resize',onWindowResize,false);
-
 	}
-	
-	function loadObjModel(modelList) {
-		for(var i=0;i<modelList.length;i++){
-			loader.load(modelList[i],function(object) {
-				object.material = new THREE.MeshLambertMaterial();
-				object.children[0].material.transparent = true;
-				object.children[0].material.side = THREE.DoubleSide;
-				camera.position.y=200;
+}
+
+function guiCtrl() {
+		var  that = this;
 		
-				object.rotation.y=Math.PI;
-				group.add(object);
-				draw(modelList.length);
-			});
-		}
-	}
-	
-	function guiCtrl() {
-			var  that = this;
+		this.groupRotate = {
+			x:0,
+			y:0,
+			z:0
+		};
+		this.resetRotate = function() {
+			group.rotation.set(0,0,0);
+			that.groupRotate.x=0;
+			that.groupRotate.y=0;
+			that.groupRotate.z=0;
+		};
+		this.groupScale = {
+			x:1,
+			y:1,
+			z:1
+		};
+		this.resetScale = function() {
+			group.scale.set(1,1,1);
+			that.groupScale.x=1;
+			that.groupScale.y=1;
+			that.groupScale.z=1;
+		};
+		this.groupPosition = {
+			x:0,
+			y:0,
+			z:0
+		};
+		this.resetPosition = function() {
+			group.position.set(0,0,0);
+			that.groupPosition.x=0;
+			that.groupPosition.y=0;
+			that.groupPosition.z=0;
+		};
+		this.groupOpacity = 1;
+		this.placeMarker = function() {
+			var geometry = new THREE.CylinderGeometry(0.8,0.8,33.5,32);
+			var material = new THREE.MeshBasicMaterial({color:0xf1c40f});
+			var cylinder = new THREE.Mesh(geometry,material);
+			markers.push(cylinder);
+			scene.add(cylinder);
 			
-			this.groupRotate = {
-				x:0,
-				y:0,
-				z:0
-			};
-			this.resetRotate = function() {
-				group.rotation.set(0,0,0);
-				that.groupRotate.x=0;
-				that.groupRotate.y=0;
-				that.groupRotate.z=0;
-			};
-			this.groupScale = {
-				x:1,
-				y:1,
-				z:1
-			};
-			this.resetScale = function() {
-				group.scale.set(1,1,1);
-				that.groupScale.x=1;
-				that.groupScale.y=1;
-				that.groupScale.z=1;
-			};
-			this.groupPosition = {
-				x:0,
-				y:0,
-				z:0
-			};
-			this.resetPosition = function() {
-				group.position.set(0,0,0);
-				that.groupPosition.x=0;
-				that.groupPosition.y=0;
-				that.groupPosition.z=0;
-			};
-			this.groupOpacity = 1;
-			this.placeMarker = function() {
-				var geometry = new THREE.CylinderGeometry(0.8,0.8,33.5,32);
-				var material = new THREE.MeshBasicMaterial({color:0xf1c40f});
-				var cylinder = new THREE.Mesh(geometry,material);
-				markers.push(cylinder);
-				scene.add(cylinder);
+			if(!that.leapController) {
+				transControls.attach(cylinder);
+			}
+		};
+		this.removeMarker = function() {
+			if(markers.length>0){
+				var electr = markers.pop();
+				transControls.detach(electr);
+				scene.remove(electr);
+				electr.geometry.dispose();
+				electr.material.dispose();
 				
-				if(!that.leapController) {
-					transControls.attach(cylinder);
+				delete electr;
+			}
+			if(markers.length>0){
+				if(!that.leapController){
+					transControls.attach(markers[markers.length-1]);
 				}
-			};
-			this.removeMarker = function() {
-				if(markers.length>0){
-					var electr = markers.pop();
-					transControls.detach(electr);
-					scene.remove(electr);
-					electr.geometry.dispose();
-					electr.material.dispose();
-					
-					delete electr;
-				}
-				if(markers.length>0){
-					if(!that.leapController){
-						transControls.attach(markers[markers.length-1]);
-					}
-				}
-			};
+			}
+		};
+		
+		this.placeElectrode = function() {
+			var electrodeMat = new THREE.MeshBasicMaterial({color:0xFFFFFF});
+			var electrodeIsolMat = new THREE.MeshBasicMaterial({color:0x00000F});
 			
-			this.placeElectrode = function() {
-				var electrodeMat = new THREE.MeshBasicMaterial({color:0xFFFFFF});
-				var electrodeIsolMat = new THREE.MeshBasicMaterial({color:0x00000F});
-				
-				var electrodeGeom = new THREE.CylinderGeometry(0.8,0.8,2,32);
-				var electrodeIsolGeom = new THREE.CylinderGeometry(0.8,0.8,1.5,32);
-				
-				var electrCount = 10;
-				
-				var pointt = new THREE.Vector3( 0, markers[markers.length-1].geometry.parameters.height/2, 0 );
-				var pointb = new THREE.Vector3( 0, -markers[markers.length-1].geometry.parameters.height/2, 0 );
-				
-				pointt.applyEuler( markers[markers.length-1].rotation );
-				pointb.applyEuler( markers[markers.length-1].rotation );
-				
-				var electrodeLength = 33.5;
-				
-				//Vector
-				var pointV = pointb.clone();
-				pointV.sub(pointt);
-				pointV.x/=electrodeLength;
-				pointV.y/=electrodeLength;
-				pointV.z/=electrodeLength;	
+			var electrodeGeom = new THREE.CylinderGeometry(0.8,0.8,2,32);
+			var electrodeIsolGeom = new THREE.CylinderGeometry(0.8,0.8,1.5,32);
 			
-				var startPoint = pointt.clone();
-							
-				var grp = new THREE.Object3D();
+			var electrCount = 10;
+			
+			var pointt = new THREE.Vector3( 0, markers[markers.length-1].geometry.parameters.height/2, 0 );
+			var pointb = new THREE.Vector3( 0, -markers[markers.length-1].geometry.parameters.height/2, 0 );
+			
+			pointt.applyEuler( markers[markers.length-1].rotation );
+			pointb.applyEuler( markers[markers.length-1].rotation );
+			
+			var electrodeLength = 33.5;
+			
+			//Vector
+			var pointV = pointb.clone();
+			pointV.sub(pointt);
+			pointV.x/=electrodeLength;
+			pointV.y/=electrodeLength;
+			pointV.z/=electrodeLength;	
+		
+			var startPoint = pointt.clone();
+						
+			var grp = new THREE.Object3D();
+			
+			var vecEl = pointV.clone().multiplyScalar(2);
+			var vecIs = pointV.clone().multiplyScalar(1.5);
+			
+			//First offset
+			startPoint.x+=vecEl.x/2;
+			startPoint.y+=vecEl.y/2;
+			startPoint.z+=vecEl.z/2;
+			
+			for (var i=0;i<(electrCount);i++){
+				var electr = new THREE.Mesh(electrodeGeom,electrodeMat);
+				var electrIs = new THREE.Mesh(electrodeIsolGeom,electrodeIsolMat);
 				
-				var vecEl = pointV.clone().multiplyScalar(2);
-				var vecIs = pointV.clone().multiplyScalar(1.5);
-				
-				//First offset
-				startPoint.x+=vecEl.x/2;
-				startPoint.y+=vecEl.y/2;
-				startPoint.z+=vecEl.z/2;
-				
-				for (var i=0;i<(electrCount*2);i+=2){
-					var electr = new THREE.Mesh(electrodeGeom,electrodeMat);
-					var electrIs = new THREE.Mesh(electrodeIsolGeom,electrodeIsolMat);
-					
-					electr.position.x=startPoint.x+markers[markers.length-1].position.x;
-					electr.position.y=startPoint.y+markers[markers.length-1].position.y;
-					electr.position.z=startPoint.z+markers[markers.length-1].position.z;
+				electr.position.x=startPoint.x+markers[markers.length-1].position.x;
+				electr.position.y=startPoint.y+markers[markers.length-1].position.y;
+				electr.position.z=startPoint.z+markers[markers.length-1].position.z;
 
-					electr.rotation.x=markers[markers.length-1].rotation.x;
-					electr.rotation.y=markers[markers.length-1].rotation.y;
-					electr.rotation.z=markers[markers.length-1].rotation.z;
+				electr.rotation.x=markers[markers.length-1].rotation.x;
+				electr.rotation.y=markers[markers.length-1].rotation.y;
+				electr.rotation.z=markers[markers.length-1].rotation.z;
 
-					grp.add(electr);
+				grp.add(electr);
+				
+				startPoint.x+=((vecEl.x/2)+(vecIs.x/2));
+				startPoint.y+=((vecEl.y/2)+(vecIs.y/2));
+				startPoint.z+=((vecEl.z/2)+(vecIs.z/2));
+				
+				if(i<9){
+					electrIs.position.x=startPoint.x+markers[markers.length-1].position.x;
+					electrIs.position.y=startPoint.y+markers[markers.length-1].position.y;
+					electrIs.position.z=startPoint.z+markers[markers.length-1].position.z;
 					
+					electrIs.rotation.x=markers[markers.length-1].rotation.x;
+					electrIs.rotation.y=markers[markers.length-1].rotation.y;
+					electrIs.rotation.z=markers[markers.length-1].rotation.z;
+				
 					startPoint.x+=((vecEl.x/2)+(vecIs.x/2));
 					startPoint.y+=((vecEl.y/2)+(vecIs.y/2));
 					startPoint.z+=((vecEl.z/2)+(vecIs.z/2));
 					
-					if(i<18){
-						electrIs.position.x=startPoint.x+markers[markers.length-1].position.x;
-						electrIs.position.y=startPoint.y+markers[markers.length-1].position.y;
-						electrIs.position.z=startPoint.z+markers[markers.length-1].position.z;
-						
-						electrIs.rotation.x=markers[markers.length-1].rotation.x;
-						electrIs.rotation.y=markers[markers.length-1].rotation.y;
-						electrIs.rotation.z=markers[markers.length-1].rotation.z;
-					
-						startPoint.x+=((vecEl.x/2)+(vecIs.x/2));
-						startPoint.y+=((vecEl.y/2)+(vecIs.y/2));
-						startPoint.z+=((vecEl.z/2)+(vecIs.z/2));
-						
-						grp.add(electrIs);
-					}
-				
+					grp.add(electrIs);
 				}
-				scene.add(grp);
-				
-				electrodes.push(grp);
-			};
 			
-			this.loadWhite = function() {
-				guiControls.resetGroup();
-				console.log('load white');
-				var modelList = [];
-				modelList.push('./models/rh.white.obj');
-				modelList.push('./models/lh.white.obj');
-				loadObjModel(modelList);
-				loadMenu();
-			};
-			
-			this.loadPial = function() {
-				guiControls.resetGroup();
-				console.log('load pial');
-				var modelList = [];
-				modelList.push('./models/rh.pial.obj');
-				modelList.push('./models/lh.pial.obj');
-				loadObjModel(modelList);
-				loadMenu();
-			};
-			
-			this.loadFile = function() {
-				var fileInput = document.getElementById('inputFile');
-				fileInput.click();
-				fileInput.onchange = function(event){
-					var length = event.target.files.length;
-					for(var i=0;i<length;i++){
-						var file = event.target.files[i];
-						var reader = new FileReader();
-						guiControls.resetGroup();
-						reader.onload = function(e) {
-							var object = loader.parse(e.target.result);
-							object.material = new THREE.MeshLambertMaterial();
-							object.children[0].material.transparent = true;
-							object.children[0].material.side = THREE.DoubleSide;
-							camera.position.y=200;
-							group.add(object);
-							
-							draw(length);
-						}
-						reader.readAsText(file);
-					}
-					
-					loadMenu();
-				};
-			};
-			
-			this.resetGroup = function() {
-				scene.remove(group);
-				for(var i=0;i<group.children.length;i++){
-					if(group.children[i].geometry == 'undefined') {
-						for (var j=0;group.children[i].children[j].length;j++){
-							if(group.children[i].children[j].geometry == 'undefined'){
-								console.log("Can't dispose of object");
-							} else {
-								var obj = group.children[i].children[j];
-								try {obj.geometry.dispose();}
-								catch (ex) {}
-								try {obj.material.dispose();}
-								catch (ex) {}
-								delete obj;
-							}
-						}
-					} else {
-						var obj = group.children[i];
-						try {obj.geometry.dispose();}
-						catch (ex) {}
-						try {obj.material.dispose();}
-						catch (ex) {}
-						delete obj;
-					}
-				}
-				delete group;
-				
-				group = new THREE.Object3D();
-			};
-			
-			this.resetElectrodes = function() {
-				var index = markers.length-1;
-				for(var i=index;i>=0;i--){
-					transControls.detach(markers[i]);
-					scene.remove(markers[i]);
-					delete markers[i];
-				}
-				
-				markers = new Array();
-				
-				var index = electrodes.length-1;
-				for(var i=index;i>=0;i--){
-					scene.remove(electrodes[i]);
-					delete electrodes[i] ;
-				}
-				
-				electrodes = new Array();
-			};
-			
-			this.resetScene = function() {
-				guiControls.resetGroup();
-				guiControls.resetElectrodes();
-				camera.position.x=0;
-				camera.position.z=0;
-				camera.position.y=200;
-				
-				orbitControls.target.x=0;
-				orbitControls.target.y=0;
-				orbitControls.target.z=0;
-			};
-			
-			this.leapController = false;
-		}
-	
-	function loadMenu() {
-		try {
-			var length = guiContainer.childNodes.length;
-			for(var i=0;i<length;i++){
-				guiContainer.removeChild(guiContainer.childNodes[0]);
 			}
-		}
-		catch(ex){}
+			scene.add(grp);
+			
+			electrodes.push(grp);
+		};
 		
-		guiControls = new guiCtrl();
+		this.loadWhite = function() {
+			guiControls.resetGroup();
+			console.log('load white');
+			var modelList = [];
+			modelList.push('./models/rh.white.obj');
+			modelList.push('./models/lh.white.obj');
+			loadObjModel(modelList);
+			loadMenu();
+		};
 		
-		gui = new dat.GUI({autoPlace: false });
-		guiContainer  = document.getElementById('menu');
+		this.loadPial = function() {
+			guiControls.resetGroup();
+			console.log('load pial');
+			var modelList = [];
+			modelList.push('./models/rh.pial.obj');
+			modelList.push('./models/lh.pial.obj');
+			loadObjModel(modelList);
+			loadMenu();
+		};
 		
-		var inputFile = document.createElement("INPUT");
-		inputFile.setAttribute("type","file");
-		inputFile.id="inputFile";
-		inputFile.style.visibility="hidden";
-		inputFile.multiple=true;
+		this.loadFile = function() {
+			var fileInput = document.getElementById('inputFile');
+			fileInput.click();
+			fileInput.onchange = function(event){
+				var length = event.target.files.length;
+				for(var i=0;i<length;i++){
+					var file = event.target.files[i];
+					var reader = new FileReader();
+					guiControls.resetGroup();
+					reader.onload = function(e) {
+						var object = loader.parse(e.target.result);
+						object.material = new THREE.MeshLambertMaterial();
+						object.children[0].material.transparent = true;
+						object.children[0].material.side = THREE.DoubleSide;
+						camera.position.y=200;
+						group.add(object);
+						
+						draw(length);
+					}
+					reader.readAsText(file);
+				}
+				
+				loadMenu();
+			};
+		};
 		
-		guiContainer.appendChild(gui.domElement);
-		guiContainer.appendChild(inputFile);
-		
-		var load = gui.addFolder('Load');
-		load.add(guiControls,'loadFile');
-		load.add(guiControls,'loadWhite');
-		load.add(guiControls,'loadPial');
-		
-		var groupFolder = gui.addFolder('Group');
-		
-		var groupRotate = groupFolder.addFolder('Rotation');
-		groupRotate.add(guiControls.groupRotate,'x').min(0).step(0.01).listen().onChange(function(e) {
-			group.rotation.x=e;
-		});
-		groupRotate.add(guiControls.groupRotate,'y').min(0).step(0.01).listen().onChange(function(e) {
-			group.rotation.y=e;
-		});
-		groupRotate.add(guiControls.groupRotate,'z').min(0).step(0.01).listen().onChange(function(e) {
-			group.rotation.z=e;
-		});
-		groupRotate.add(guiControls,'resetRotate');
-		
-		var groupScale = groupFolder.addFolder('Scale');
-		groupScale.add(guiControls.groupScale,'x').min(0).step(0.01).listen().onChange(function(e) {
-			group.scale.x=e;
-		});
-		groupScale.add(guiControls.groupScale,'y').min(0).step(0.01).listen().onChange(function(e) {
-			group.scale.y=e;
-		});
-		groupScale.add(guiControls.groupScale,'z').min(0).step(0.01).listen().onChange(function(e) {
-			group.scale.z=e;
-		});
-		groupScale.add(guiControls,'resetScale');
-		
-		var groupPosition = groupFolder.addFolder('Position');
-		groupPosition.add(guiControls.groupPosition,'x').step(1).listen().onChange(function(e) {
-			group.position.x=e;
-		});
-		groupPosition.add(guiControls.groupPosition,'y').step(1).listen().onChange(function(e) {
-			group.position.y=e;
-		});
-		groupPosition.add(guiControls.groupPosition,'z').step(1).listen().onChange(function(e) {
-			group.position.z=e;
-		});		
-		groupPosition.add(guiControls,'resetPosition');
-		
-		var groupOpacity = groupFolder.addFolder('Opacity');
-		groupOpacity.add(guiControls,'groupOpacity').min(0).step(0.01).max(1).listen().onChange(function(e){
+		this.resetGroup = function() {
+			scene.remove(group);
 			for(var i=0;i<group.children.length;i++){
-				group.children[i].children[0].material.opacity = e;
-			}
-		});
-		
-		var electrodeFolder = gui.addFolder('Electrode');
-		electrodeFolder.add(guiControls,'placeMarker');
-		electrodeFolder.add(guiControls,'removeMarker');
-		electrodeFolder.add(guiControls,'placeElectrode');
-	
-		gui.add(guiControls,'resetScene');
-		gui.add(guiControls,'leapController').onChange(function(e){
-			if(e){
-				if(markers.length > 0){
-					transControls.detach(markers[markers.length-1]);
+				if(group.children[i].geometry == 'undefined') {
+					for (var j=0;group.children[i].children[j].length;j++){
+						if(group.children[i].children[j].geometry == 'undefined'){
+							console.log("Can't dispose of object");
+						} else {
+							var obj = group.children[i].children[j];
+							try {obj.geometry.dispose();}
+							catch (ex) {}
+							try {obj.material.dispose();}
+							catch (ex) {}
+							delete obj;
+						}
+					}
+				} else {
+					var obj = group.children[i];
+					try {obj.geometry.dispose();}
+					catch (ex) {}
+					try {obj.material.dispose();}
+					catch (ex) {}
+					delete obj;
 				}
-				controller.connect();
-			} else {
-				if(markers.length > 0){
-					transControls.attach(markers[markers.length-1]);
-				}
-				controller.disconnect();
 			}
-		});
-	};
-	    
-	function rotateAroundWorldAxis(object, axis, radians) {
-		var rotWorldMatrix = new THREE.Matrix4();
-		rotWorldMatrix.makeRotationAxis(axis.normalize(), radians);
-
-		rotWorldMatrix.multiply(object.matrix);
-
-		object.matrix = rotWorldMatrix;
-
-		object.rotation.setFromRotationMatrix(object.matrix);
-	}
-	
-	function leapObjectControl(object) {
-		var frame = controller.frame();
-		var fingers = 0;
-		for(var i=0;i<frame.pointables.length;i++){
-			if(frame.pointables[i].extended){
-				fingers++;
-			}
-		}
-		if(fingers != 0 ){
-			var pos = frame.pointables[1].tipPosition;
-		
-			var x = pos[0];
-			var y = pos[1];
-			var z = pos[2];
+			delete group;
 			
-			if(fingers == 5){
-				if(lastRotationX == undefined) lastRotationX = x;
-				if(lastRotationY == undefined) lastRotationY = y;
-				
-				dRX = x-lastRotationX;
-				dRY = y-lastRotationY;
-				
-				lastRotationX=x;
-				lastRotationY=y;
-				
-				var rotateRight = new THREE.Vector3(0,1,0);
-				rotateRight.applyQuaternion(camera.quaternion);
-				rotateAroundWorldAxis(object,rotateRight,dRX/100); //rotate on x axis
-				dRX=0;
-				
-				
-				var rotateUp = new THREE.Vector3(-1,0,0);
-				rotateUp.applyQuaternion(camera.quaternion);
-				rotateAroundWorldAxis(object,rotateUp,dRY/100); //rotate on x axis
-				dRY=0;
-			} else if( fingers == 3 ){
-
-				if(lastPanX == undefined) lastPanX = x;
-				if(lastPanY == undefined) lastPanY = y;
-				if(lastPanZ == undefined) lastPanZ = z;
-				
-				dPX = x-lastPanX;
-				dPY = y-lastPanY;
-				dPZ = z-lastPanZ;
-				
-				var translateUp = new THREE.Vector3(0,1,0);
-				translateUp.applyQuaternion(camera.quaternion);
-				object.translateOnAxis(translateUp,dPY);
-				
-				var translateRight = new THREE.Vector3(1,0,0);
-				translateRight.applyQuaternion(camera.quaternion);
-				object.translateOnAxis(translateRight,dPX);
-				
-				var translateFront = new THREE.Vector3(0,0,1);
-				translateFront.applyQuaternion(camera.quaternion);
-				object.translateOnAxis(translateFront,dPZ);
-				
-				lastPanX=x;
-				lastPanY=y;
-				lastPanZ=z;
-			}
-			else {
-				lastRotationX=undefined;
-				lastRotationY=undefined;
-				lastPanX=undefined;
-				lastPanY=undefined;
-				lastPanZ=undefined;
+			group = new THREE.Object3D();
+		};
+		
+		this.resetElectrodes = function() {
+			var index = markers.length-1;
+			for(var i=index;i>=0;i--){
+				transControls.detach(markers[i]);
+				scene.remove(markers[i]);
+				delete markers[i];
 			}
 			
+			markers = new Array();
+			
+			var index = electrodes.length-1;
+			for(var i=index;i>=0;i--){
+				scene.remove(electrodes[i]);
+				delete electrodes[i] ;
+			}
+			
+			electrodes = new Array();
+		};
+		
+		this.resetScene = function() {
+			guiControls.resetGroup();
+			guiControls.resetElectrodes();
+			camera.position.x=0;
+			camera.position.z=0;
+			camera.position.y=200;
+			
+			orbitControls.target.x=0;
+			orbitControls.target.y=0;
+			orbitControls.target.z=0;
+		};
+		
+		this.leapController = false;
+	}
+
+function loadMenu() {
+	try {
+		var length = guiContainer.childNodes.length;
+		for(var i=0;i<length;i++){
+			guiContainer.removeChild(guiContainer.childNodes[0]);
 		}
 	}
+	catch(ex){}
 	
-	function draw(count) {
-		if(group.children.length==count){
-			scene.add(group);
+	guiControls = new guiCtrl();
+	
+	gui = new dat.GUI({autoPlace: false });
+	guiContainer  = document.getElementById('menu');
+	
+	var inputFile = document.createElement("INPUT");
+	inputFile.setAttribute("type","file");
+	inputFile.id="inputFile";
+	inputFile.style.visibility="hidden";
+	inputFile.multiple=true;
+	
+	guiContainer.appendChild(gui.domElement);
+	guiContainer.appendChild(inputFile);
+	
+	var load = gui.addFolder('Load');
+	load.add(guiControls,'loadFile');
+	load.add(guiControls,'loadWhite');
+	load.add(guiControls,'loadPial');
+	
+	var groupFolder = gui.addFolder('Group');
+	
+	var groupRotate = groupFolder.addFolder('Rotation');
+	groupRotate.add(guiControls.groupRotate,'x').min(0).step(0.01).listen().onChange(function(e) {
+		group.rotation.x=e;
+	});
+	groupRotate.add(guiControls.groupRotate,'y').min(0).step(0.01).listen().onChange(function(e) {
+		group.rotation.y=e;
+	});
+	groupRotate.add(guiControls.groupRotate,'z').min(0).step(0.01).listen().onChange(function(e) {
+		group.rotation.z=e;
+	});
+	groupRotate.add(guiControls,'resetRotate');
+	
+	var groupScale = groupFolder.addFolder('Scale');
+	groupScale.add(guiControls.groupScale,'x').min(0).step(0.01).listen().onChange(function(e) {
+		group.scale.x=e;
+	});
+	groupScale.add(guiControls.groupScale,'y').min(0).step(0.01).listen().onChange(function(e) {
+		group.scale.y=e;
+	});
+	groupScale.add(guiControls.groupScale,'z').min(0).step(0.01).listen().onChange(function(e) {
+		group.scale.z=e;
+	});
+	groupScale.add(guiControls,'resetScale');
+	
+	var groupPosition = groupFolder.addFolder('Position');
+	groupPosition.add(guiControls.groupPosition,'x').step(1).listen().onChange(function(e) {
+		group.position.x=e;
+	});
+	groupPosition.add(guiControls.groupPosition,'y').step(1).listen().onChange(function(e) {
+		group.position.y=e;
+	});
+	groupPosition.add(guiControls.groupPosition,'z').step(1).listen().onChange(function(e) {
+		group.position.z=e;
+	});		
+	groupPosition.add(guiControls,'resetPosition');
+	
+	var groupOpacity = groupFolder.addFolder('Opacity');
+	groupOpacity.add(guiControls,'groupOpacity').min(0).step(0.01).max(1).listen().onChange(function(e){
+		for(var i=0;i<group.children.length;i++){
+			group.children[i].children[0].material.opacity = e;
 		}
-	};
+	});
 	
-	function onWindowResize() {
-		canvasWidth = window.innerWidth-menuWidth;
-		canvasHeight = window.innerHeight;
-		renderer.setSize(canvasWidth,canvasHeight);
-		
-		camera.aspect = canvasWidth/canvasHeight;
-		camera.updateProjectionMatrix();
-		
-		render();
-	};
-	
-	function render() {
-		renderer.render(scene,camera);
-	};
-	
-	function animate() {
-		requestAnimationFrame(animate,container);
-		orbitControls.update();
-		transControls.update();
-		stats.update();
-		if(guiControls.leapController) {
-			leapObjectControl(markers[markers.length-1]);
+	var electrodeFolder = gui.addFolder('Electrode');
+	electrodeFolder.add(guiControls,'placeMarker');
+	electrodeFolder.add(guiControls,'removeMarker');
+	electrodeFolder.add(guiControls,'placeElectrode');
+
+	gui.add(guiControls,'resetScene');
+	gui.add(guiControls,'leapController').onChange(function(e){
+		if(e){
+			if(markers.length > 0){
+				transControls.detach(markers[markers.length-1]);
+			}
+			controller.connect();
+		} else {
+			if(markers.length > 0){
+				transControls.attach(markers[markers.length-1]);
+			}
+			controller.disconnect();
 		}
-		render();
-	};
+	});
+};
+	
+function rotateAroundWorldAxis(object, axis, radians) {
+	var rotWorldMatrix = new THREE.Matrix4();
+	rotWorldMatrix.makeRotationAxis(axis.normalize(), radians);
+
+	rotWorldMatrix.multiply(object.matrix);
+
+	object.matrix = rotWorldMatrix;
+
+	object.rotation.setFromRotationMatrix(object.matrix);
+}
+
+function leapObjectControl(object) {
+	var frame = controller.frame();
+	var fingers = 0;
+	for(var i=0;i<frame.pointables.length;i++){
+		if(frame.pointables[i].extended){
+			fingers++;
+		}
+	}
+	if(fingers != 0 ){
+		var pos = frame.pointables[1].tipPosition;
+	
+		var x = pos[0];
+		var y = pos[1];
+		var z = pos[2];
+		
+		if(fingers == 5){
+			if(lastRotationX == undefined) lastRotationX = x;
+			if(lastRotationY == undefined) lastRotationY = y;
+			
+			dRX = x-lastRotationX;
+			dRY = y-lastRotationY;
+			
+			lastRotationX=x;
+			lastRotationY=y;
+			
+			var rotateRight = new THREE.Vector3(0,1,0);
+			rotateRight.applyQuaternion(camera.quaternion);
+			rotateAroundWorldAxis(object,rotateRight,dRX/100); //rotate on x axis
+			dRX=0;
+			
+			
+			var rotateUp = new THREE.Vector3(-1,0,0);
+			rotateUp.applyQuaternion(camera.quaternion);
+			rotateAroundWorldAxis(object,rotateUp,dRY/100); //rotate on x axis
+			dRY=0;
+		} else if( fingers == 3 ){
+
+			if(lastPanX == undefined) lastPanX = x;
+			if(lastPanY == undefined) lastPanY = y;
+			if(lastPanZ == undefined) lastPanZ = z;
+			
+			dPX = x-lastPanX;
+			dPY = y-lastPanY;
+			dPZ = z-lastPanZ;
+			
+			var translateUp = new THREE.Vector3(0,1,0);
+			translateUp.applyQuaternion(camera.quaternion);
+			object.translateOnAxis(translateUp,dPY);
+			
+			var translateRight = new THREE.Vector3(1,0,0);
+			translateRight.applyQuaternion(camera.quaternion);
+			object.translateOnAxis(translateRight,dPX);
+			
+			var translateFront = new THREE.Vector3(0,0,1);
+			translateFront.applyQuaternion(camera.quaternion);
+			object.translateOnAxis(translateFront,dPZ);
+			
+			lastPanX=x;
+			lastPanY=y;
+			lastPanZ=z;
+		}
+		else {
+			lastRotationX=undefined;
+			lastRotationY=undefined;
+			lastPanX=undefined;
+			lastPanY=undefined;
+			lastPanZ=undefined;
+		}
+		
+	}
+}
+
+function draw(count) {
+	if(group.children.length==count){
+		scene.add(group);
+	}
+};
+
+function onWindowResize() {
+	canvasWidth = window.innerWidth-menuWidth;
+	canvasHeight = window.innerHeight;
+	renderer.setSize(canvasWidth,canvasHeight);
+	
+	camera.aspect = canvasWidth/canvasHeight;
+	camera.updateProjectionMatrix();
+	
+	render();
+};
+
+function render() {
+	renderer.render(scene,camera);
+};
+
+function animate() {
+	requestAnimationFrame(animate,container);
+	orbitControls.update();
+	transControls.update();
+	stats.update();
+	if(guiControls.leapController) {
+		leapObjectControl(markers[markers.length-1]);
+	}
+	render();
+};
 	
 </script>
 </body> 
