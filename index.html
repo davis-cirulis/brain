@@ -513,13 +513,12 @@ function leapObjectControl(object) {
 			
 			var rotateRight = new THREE.Vector3(0,1,0);
 			rotateRight.applyQuaternion(camera.quaternion);
-			rotateAroundWorldAxis(object,rotateRight,dRX/100); //rotate on x axis
+			rotateAroundWorldAxis(object,rotateRight,dRX/100);
 			dRX=0;
-			
 			
 			var rotateUp = new THREE.Vector3(-1,0,0);
 			rotateUp.applyQuaternion(camera.quaternion);
-			rotateAroundWorldAxis(object,rotateUp,dRY/100); //rotate on x axis
+			rotateAroundWorldAxis(object,rotateUp,dRY/100);
 			dRY=0;
 		} else if( fingers == 3 ){
 
@@ -530,6 +529,13 @@ function leapObjectControl(object) {
 			dPX = x-lastPanX;
 			dPY = y-lastPanY;
 			dPZ = z-lastPanZ;
+			
+			var obj = new THREE.Object3D();
+			obj.rotation.x = object.rotation.x;
+			obj.rotation.y = object.rotation.y;
+			obj.rotation.z = object.rotation.z;
+			
+			object.rotation.set(0,0,0);
 			
 			var translateUp = new THREE.Vector3(0,1,0);
 			translateUp.applyQuaternion(camera.quaternion);
@@ -542,6 +548,8 @@ function leapObjectControl(object) {
 			var translateFront = new THREE.Vector3(0,0,1);
 			translateFront.applyQuaternion(camera.quaternion);
 			object.translateOnAxis(translateFront,dPZ);
+			
+			object.rotation.set(obj.rotation.x,obj.rotation.y,obj.rotation.z);
 			
 			lastPanX=x;
 			lastPanY=y;
