@@ -36,6 +36,7 @@ var markers = [];
 var lastRotationX,lastRotationY;
 var lastPanX, lastPanY, lastPanZ;
 var dRX=0,dRY=0,dPX=0,dPY=0,dPZ=0;
+var rotateSensitivity=1,panSensitivity=1;
 
 init();
 animate();
@@ -379,6 +380,9 @@ function guiCtrl() {
 		};
 		
 		this.leapController = false;
+		
+		this.rotateSensitivity = 1;
+		this.panSensitivity = 1;
 	}
 
 function loadMenu() {
@@ -459,8 +463,8 @@ function loadMenu() {
 	electrodeFolder.add(guiControls,'removeMarker');
 	electrodeFolder.add(guiControls,'placeElectrode');
 
-	gui.add(guiControls,'resetScene');
-	gui.add(guiControls,'leapController').onChange(function(e){
+	var leapFolder = gui.addFolder('LeapMotion');
+	leapFolder.add(guiControls,'leapController').onChange(function(e){
 		if(e){
 			if(markers.length > 0){
 				transControls.detach(markers[markers.length-1]);
@@ -473,6 +477,14 @@ function loadMenu() {
 			controller.disconnect();
 		}
 	});
+	leapFolder.add(guiControls,'rotateSensitivity').min(0.01).step(0.01).onChange(function(e) {
+		if(e>1) {guiControls.rotateSensitivity=1;}
+	});
+	leapFolder.add(guiControls,'panSensitivity').min(0.01).step(0.01).onChange(function(e) {
+		if(e>1) {guiControls.panSensitivity=1;}
+	}).listen();
+	
+	gui.add(guiControls,'resetScene');
 };
 	
 function rotateAroundWorldAxis(object, axis, radians) {
@@ -513,12 +525,12 @@ function leapObjectControl(object) {
 			
 			var rotateRight = new THREE.Vector3(0,1,0);
 			rotateRight.applyQuaternion(camera.quaternion);
-			rotateAroundWorldAxis(object,rotateRight,dRX/100);
+			rotateAroundWorldAxis(object,rotateRight,(dRX/100)*guiControls.rotateSensitivity);
 			dRX=0;
 			
 			var rotateUp = new THREE.Vector3(-1,0,0);
 			rotateUp.applyQuaternion(camera.quaternion);
-			rotateAroundWorldAxis(object,rotateUp,dRY/100);
+			rotateAroundWorldAxis(object,rotateUp,(dRY/100)*guiControls.rotateSensitivity);
 			dRY=0;
 		} else if( fingers == 3 ){
 
@@ -539,15 +551,15 @@ function leapObjectControl(object) {
 			
 			var translateUp = new THREE.Vector3(0,1,0);
 			translateUp.applyQuaternion(camera.quaternion);
-			object.translateOnAxis(translateUp,dPY);
+			object.translateOnAxis(translateUp,dPY*guiControls.panSensitivity);
 			
 			var translateRight = new THREE.Vector3(1,0,0);
 			translateRight.applyQuaternion(camera.quaternion);
-			object.translateOnAxis(translateRight,dPX);
+			object.translateOnAxis(translateRight,dPX*guiControls.panSensitivity);
 			
 			var translateFront = new THREE.Vector3(0,0,1);
 			translateFront.applyQuaternion(camera.quaternion);
-			object.translateOnAxis(translateFront,dPZ);
+			object.translateOnAxis(translateFront,dPZ*guiControls.panSensitivity);
 			
 			object.rotation.set(obj.rotation.x,obj.rotation.y,obj.rotation.z);
 			
