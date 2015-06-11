@@ -532,7 +532,7 @@ function leapObjectControl(object) {
 			rotateUp.applyQuaternion(camera.quaternion);
 			rotateAroundWorldAxis(object,rotateUp,(dRY/100)*guiControls.rotateSensitivity);
 			dRY=0;
-		} else if( fingers == 3 ){
+		} else if( fingers == 2 && frame.pointables[1].extended && frame.pointables[2].extended){
 
 			if(lastPanX == undefined) lastPanX = x;
 			if(lastPanY == undefined) lastPanY = y;
